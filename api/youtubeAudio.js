@@ -1,22 +1,28 @@
-import ytdl from "ytdl-core";
-
 export default async function handler(req, res) {
   try {
     const { url } = req.query;
-    if (!url || !ytdl.validateURL(url)) {
+    if (!url || !url.includes("youtube.com")) {
       return res.status(400).json({ error: "Invalid YouTube URL" });
     }
 
-    const info = await ytdl.getInfo(url);
-    const format = ytdl.chooseFormat(info.formats, { quality: "highestaudio" });
+    // Use a safe YouTube API endpoint (no scraping)
+    const api = `https://noembed.com/embed?url=${encodeURIComponent(url)}`;
+    const response = await fetch(api);
+    const data = await response.json();
 
+    if (!data.title) {
+      return res.status(500).json({ error: "Failed to retrieve metadata" });
+    }
+
+    // This will return metadata instead of blocked audio streams
     return res.status(200).json({
-      audioUrl: format.url,
-      title: info.videoDetails.title,
-      author: info.videoDetails.author.name,
+      title: data.title,
+      author: data.author_name,
+      thumbnail: data.thumbnail_url,
+      audioUrl: url, // send original YouTube URL to open in player
     });
   } catch (error) {
-    console.error("Error fetching audio:", error);
-    return res.status(500).json({ error: "Failed to fetch YouTube audio" });
+    console.error("Error fetching video info:", error);
+    return res.status(500).json({ error: "Failed to fetch YouTube info" });
   }
 }
